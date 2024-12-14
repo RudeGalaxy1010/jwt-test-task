@@ -4,8 +4,8 @@ import (
 	"net/http"
 )
 
-func Start() error {
+func Start(config *Config) error {
 	server := NewServer()
 
-	return http.ListenAndServe("localhost:5000", server)
+	return http.ListenAndServe(config.Address, server)
 }
