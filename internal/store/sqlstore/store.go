@@ -19,7 +19,7 @@ func New(db *sql.DB) *Store {
 }
 
 func (store *Store) User() store.UserRepository {
-	if store.UserRepository != nil {
+	if store.UserRepository == nil {
 		store.UserRepository = &UserRepository{
 			store: store,
 		}
