@@ -22,11 +22,12 @@ func (repository *UserRepository) Create(u *model.User) error {
 func (repository *UserRepository) Find(id string) (*model.User, error) {
 	user := &model.User{}
 	if err := repository.store.db.QueryRow(
-		"SELECT id, ipaddress FROM users WHERE id = $1",
+		"SELECT id, ipaddress, refresh FROM users WHERE id = $1",
 		id,
 	).Scan(
 		&user.Id,
 		&user.IpAddress,
+		&user.Refresh,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, store.ErrRecordNotFound
@@ -36,4 +37,14 @@ func (repository *UserRepository) Find(id string) (*model.User, error) {
 	}
 
 	return user, nil
+}
+
+func (repository *UserRepository) UpdateRefreshToken(user *model.User) error {
+	id := ""
+
+	return repository.store.db.QueryRow(
+		"UPDATE users SET refresh = $1 WHERE id = $2 RETURNING id",
+		user.Refresh,
+		user.Id,
+	).Scan(&id)
 }

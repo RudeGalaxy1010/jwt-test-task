@@ -2,5 +2,6 @@ package model
 
 type User struct {
 	Id        string `json:"id"`
-	IpAddress string `json:"ipAddress"`
+	IpAddress string `json:"ipaddress"`
+	Refresh   string `json:"refresh"`
 }
