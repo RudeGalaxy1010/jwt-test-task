@@ -4,16 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/RudeGalaxy1010/jwt-test-task/internal/store"
 	"github.com/gorilla/mux"
 )
 
 type Server struct {
 	router *mux.Router
+	store  store.Store
 }
 
-func NewServer() *Server {
+func NewServer(store store.Store) *Server {
 	server := &Server{
 		router: mux.NewRouter(),
+		store:  store,
 	}
 
 	server.ConfigureRouter()
