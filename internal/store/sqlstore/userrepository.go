@@ -19,7 +19,7 @@ func (repository *UserRepository) Create(u *model.User) error {
 	).Scan(&u.Id)
 }
 
-func (repository *UserRepository) Find(id int) (*model.User, error) {
+func (repository *UserRepository) Find(id string) (*model.User, error) {
 	user := &model.User{}
 	if err := repository.store.db.QueryRow(
 		"SELECT id, ipAddress FROM users WHERE id = $1",

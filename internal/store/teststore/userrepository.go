@@ -9,17 +9,17 @@ import (
 
 type UserRepository struct {
 	store *Store
-	users map[int]*model.User
+	users map[string]*model.User
 }
 
 func (repository *UserRepository) Create(u *model.User) error {
-	u.Id = len(repository.users) + 1
+	u.Id = string(len(repository.users) + 1)
 	fmt.Println(u.Id)
 	repository.users[u.Id] = u
 	return nil
 }
 
-func (repository *UserRepository) Find(id int) (*model.User, error) {
+func (repository *UserRepository) Find(id string) (*model.User, error) {
 	u, ok := repository.users[id]
 
 	if !ok {
