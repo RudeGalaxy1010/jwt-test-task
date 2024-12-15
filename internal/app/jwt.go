@@ -15,10 +15,10 @@ type TokensPair struct {
 	Refresh string `json:"refresh"`
 }
 
-func NewAccessToken(user *model.User, id, key string) (string, error) {
+func NewAccessToken(user *model.User, id, ipAddress, key string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": user.Id,
-		"ip":  user.IpAddress,
+		"ip":  ipAddress,
 		"exp": time.Now().Add(15 * time.Minute).Unix(),
 		"iat": time.Now().Unix(),
 		"jti": id,
@@ -40,7 +40,7 @@ func NewRefreshToken(user *model.User) (string, error) {
 	return base64Token, nil
 }
 
-func ValidateRefresh(access, refresh, key string) (string, error) {
+func DecodeAccess(access, key string) (string, string, error) {
 	token, err := jwt.Parse(access, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return "", errors.New("failed to parse token")
@@ -49,20 +49,41 @@ func ValidateRefresh(access, refresh, key string) (string, error) {
 	})
 
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
+	userId := ""
 	ip := ""
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userId = claims["sub"].(string)
+		ip = claims["ip"].(string)
+	}
+
+	return userId, ip, nil
+}
+
+func ValidateRefresh(access, refresh, key string) error {
+	token, err := jwt.Parse(access, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return "", errors.New("failed to parse token")
+		}
+		return []byte(key), nil
+	})
+
+	if err != nil {
+		return err
+	}
+
 	refreshId := ""
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		ip = claims["ip"].(string)
 		refreshId = claims["jti"].(string)
 	}
 
 	if refreshId != refresh {
-		return "", errors.New("invalid token pair")
+		return errors.New("invalid token pair")
 	}
 
-	return ip, nil
+	return nil
 }

@@ -3,7 +3,6 @@ package apiserver
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -66,7 +65,7 @@ func (server *Server) HandleJwtGet() http.HandlerFunc {
 		guid := strings.TrimSpace(req.Guid)
 
 		if len(guid) == 0 {
-			server.Error(w, r, http.StatusBadRequest, errors.New("guid can't be empty"))
+			server.Error(w, r, http.StatusBadRequest, ErrInsufficientRequest)
 			return
 		}
 
@@ -75,40 +74,39 @@ func (server *Server) HandleJwtGet() http.HandlerFunc {
 		user, err := server.store.User().Find(guid)
 
 		if err != nil {
-			server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to find user"))
+			server.Error(w, r, http.StatusUnprocessableEntity, ErrUserNotFound)
 			return
 		}
 
 		uuid := uuid.New().String()
-		access, err := jwt.NewAccessToken(user, uuid, server.key)
+		access, err := jwt.NewAccessToken(user, uuid, ipAddress, server.key)
 
 		if err != nil {
-			server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to create access token"))
+			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
 			return
 		}
 
 		hashedRefresh, err := bcrypt.GenerateFromPassword([]byte(uuid), bcrypt.DefaultCost)
 
 		if err != nil {
-			server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to create refresh token"))
+			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
 			return
 		}
 
 		if user == nil {
 			user := &model.User{
-				Id:        guid,
-				IpAddress: ipAddress,
-				Refresh:   string(hashedRefresh),
+				Id:      guid,
+				Refresh: string(hashedRefresh),
 			}
 
 			if err := server.store.User().Create(user); err != nil {
-				server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to create user"))
+				server.Error(w, r, http.StatusUnprocessableEntity, ErrUserCreationFailed)
 				return
 			}
 		} else {
 			user.Refresh = string(hashedRefresh)
 			if err := server.store.User().UpdateRefreshToken(user); err != nil {
-				server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to update user"))
+				server.Error(w, r, http.StatusUnprocessableEntity, ErrUserUpdateFailed)
 				return
 			}
 		}
@@ -121,71 +119,74 @@ func (server *Server) HandleJwtGet() http.HandlerFunc {
 }
 
 func (server *Server) HandleJwtRefresh() http.HandlerFunc {
-	type request struct {
-		Guid       string         `json:"guid"`
-		TokensPair jwt.TokensPair `json:"tokens"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		req := &request{}
+		req := &jwt.TokensPair{}
 
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 			server.Error(w, r, http.StatusBadRequest, err)
 			return
 		}
 
-		user, err := server.store.User().Find(req.Guid)
+		userId, ip, err := jwt.DecodeAccess(req.Access, server.key)
 
 		if err != nil {
-			server.Error(w, r, http.StatusBadRequest, errors.New("user not found"))
+			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
+		}
+
+		user, err := server.store.User().Find(userId)
+
+		if err != nil {
+			server.Error(w, r, http.StatusBadRequest, ErrUserNotFound)
 			return
 		}
 
-		decodedRefresh, err := base64.StdEncoding.DecodeString(req.TokensPair.Refresh)
+		decodedRefresh, err := base64.StdEncoding.DecodeString(req.Refresh)
 
 		if err != nil {
-			server.Error(w, r, http.StatusBadRequest, errors.New("invalid token"))
+			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
 			return
 		}
 
 		err = bcrypt.CompareHashAndPassword([]byte(user.Refresh), decodedRefresh)
 
 		if err != nil {
-			server.Error(w, r, http.StatusBadRequest, errors.New("invalid token"))
+			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
 			return
 		}
 
-		ip, err := jwt.ValidateRefresh(req.TokensPair.Access, string(decodedRefresh), server.key)
+		err = jwt.ValidateRefresh(req.Access, string(decodedRefresh), server.key)
 
 		if err != nil {
-			server.Error(w, r, http.StatusBadRequest, errors.New("invalid token"))
+			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
 			return
 		}
 
-		if ip != user.IpAddress {
+		ipAddress := strings.Split(r.RemoteAddr, ":")[0]
+
+		if ip != ipAddress {
 			// TODO: Send email
-			fmt.Printf("ip diff detected, expected: %s , was: %s", user.IpAddress, ip)
+			fmt.Printf("ip diff detected, expected: %s , was: %s", ipAddress, ip)
 			fmt.Println()
 		}
 
 		uuid := uuid.New().String()
-		access, err := jwt.NewAccessToken(user, uuid, server.key)
+		access, err := jwt.NewAccessToken(user, uuid, ipAddress, server.key)
 
 		if err != nil {
-			server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to create access token"))
+			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
 			return
 		}
 
 		newHashedRefresh, err := bcrypt.GenerateFromPassword([]byte(uuid), bcrypt.DefaultCost)
 
 		if err != nil {
-			server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to create refresh token"))
+			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
 			return
 		}
 
 		user.Refresh = string(newHashedRefresh)
 		if err := server.store.User().UpdateRefreshToken(user); err != nil {
-			server.Error(w, r, http.StatusUnprocessableEntity, errors.New("failed to update user"))
+			server.Error(w, r, http.StatusUnprocessableEntity, ErrUserUpdateFailed)
 			return
 		}
 

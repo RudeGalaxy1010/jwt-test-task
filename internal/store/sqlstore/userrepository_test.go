@@ -26,8 +26,7 @@ func TestUserRepository_Find(t *testing.T) {
 	u := model.TestUser(t)
 
 	sqlstore.User().Create(&model.User{
-		Id:        u.Id,
-		IpAddress: u.IpAddress,
+		Id: u.Id,
 	})
 	user, err := sqlstore.User().Find(u.Id)
 	assert.NoError(t, err)
