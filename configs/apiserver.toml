@@ -1,3 +1,5 @@
+# Note: Should be secret! Not to be stored at repository it's just for demonstration purposes!
+
 address = "localhost:5000"
 database_url = "user=postgres password=1938 host=localhost dbname=jwt-test-task sslmode=disable"
 secret_key = "secret-key"
