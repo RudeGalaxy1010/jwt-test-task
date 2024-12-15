@@ -20,6 +20,10 @@ Simple rest-api app to provide pair of tokens (JWT Access token + Refresh token)
 
 <h1>Results:</h1>
 <ul>
-</p>2. ![image](https://github.com/user-attachments/assets/f9fd13f6-33e6-4fd2-aaa7-0e8d565d3c00)
-</p>3. ![image](https://github.com/user-attachments/assets/d5e90be8-e84f-487b-abd2-24119d7f42f1)
+</p>2. Access token: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQyNzQyMDEsImlhdCI6MTczNDI3MzMwMSwiaXAiOiIxMjcuMC4wLjEiLCJqdGkiOiJlZDZkMzc5MS02MmMyLTRjYjktODEwNi1kYTcyMjg1NjcwZmYiLCJzdWIiOiJhc2NzIn0.Xp_Svc60X-xs_boqtcQohqnkG1fUXLUYMbKh1VkUbdOs-VwNNbc56PczJTR4CWZmed-m7yIZZHmNPOr2xXG5lw
+</p> Refresh token: ZWQ2ZDM3OTEtNjJjMi00Y2I5LTgxMDYtZGE3MjI4NTY3MGZm
+</p><image src ="https://github.com/user-attachments/assets/f9fd13f6-33e6-4fd2-aaa7-0e8d565d3c00"></image>
+</p>3. Access token: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQyNzQyNzIsImlhdCI6MTczNDI3MzM3MiwiaXAiOiIxMjcuMC4wLjEiLCJqdGkiOiIyMWVmODNlMy1mM2UyLTRkYWMtYjc5Ni02OGEzZDk1MzU3MzciLCJzdWIiOiJhc2NzIn0.Au5Is_-9bh92rnNXisIB17lXIUof7ER7xBer6lifyhkB61JG4xei8LVPGnhDu36VYiMQJfuHJVAnahyzVOfugQ
+</p> Refresh token: MjFlZjgzZTMtZjNlMi00ZGFjLWI3OTYtNjhhM2Q5NTM1NzM3
+<image src ="https://github.com/user-attachments/assets/d5e90be8-e84f-487b-abd2-24119d7f42f1"></image>
 </ul>
