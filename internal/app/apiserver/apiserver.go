@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/RudeGalaxy1010/jwt-test-task/internal/app/tokenhandler"
 	"github.com/RudeGalaxy1010/jwt-test-task/internal/store/sqlstore"
 )
 
@@ -16,7 +17,8 @@ func Start(config *Config) error {
 
 	defer db.Close()
 	store := sqlstore.New(db)
-	server := NewServer(store, config.Secret_key)
+	jwtHandler := tokenhandler.JwtNew([]byte(config.Secret_key))
+	server := NewServer(store, *jwtHandler)
 
 	return http.ListenAndServe(config.Address, server)
 }

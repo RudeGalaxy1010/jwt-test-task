@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	jwt "github.com/RudeGalaxy1010/jwt-test-task/internal/app"
+	tokenHandler "github.com/RudeGalaxy1010/jwt-test-task/internal/app/tokenhandler"
 	"github.com/RudeGalaxy1010/jwt-test-task/internal/model"
 	"github.com/RudeGalaxy1010/jwt-test-task/internal/store"
 	"github.com/google/uuid"
@@ -16,16 +16,21 @@ import (
 )
 
 type Server struct {
-	router *mux.Router
-	store  store.Store
-	key    string
+	router     *mux.Router
+	store      store.Store
+	jwtHandler tokenHandler.JwtHandler
 }
 
-func NewServer(store store.Store, key string) *Server {
+type TokensPair struct {
+	Access  string `json:"access"`
+	Refresh string `json:"refresh"`
+}
+
+func NewServer(store store.Store, jwtHandler tokenHandler.JwtHandler) *Server {
 	server := &Server{
-		router: mux.NewRouter(),
-		store:  store,
-		key:    key,
+		router:     mux.NewRouter(),
+		store:      store,
+		jwtHandler: jwtHandler,
 	}
 
 	server.ConfigureRouter()
@@ -69,8 +74,6 @@ func (server *Server) HandleJwtGet() http.HandlerFunc {
 			return
 		}
 
-		ipAddress := strings.Split(r.RemoteAddr, ":")[0]
-
 		user, err := server.store.User().Find(guid)
 
 		if err != nil {
@@ -78,15 +81,17 @@ func (server *Server) HandleJwtGet() http.HandlerFunc {
 			return
 		}
 
-		uuid := uuid.New().String()
-		access, err := jwt.NewAccessToken(user, uuid, ipAddress, server.key)
+		ipAddress := strings.Split(r.RemoteAddr, ":")[0]
+		refreshToken := server.jwtHandler.NewRefreshToken()
+		base64RefreshToken := base64.StdEncoding.EncodeToString([]byte(refreshToken))
+		access, err := server.jwtHandler.NewAccessToken(user, ipAddress, refreshToken)
 
 		if err != nil {
 			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
 			return
 		}
 
-		hashedRefresh, err := bcrypt.GenerateFromPassword([]byte(uuid), bcrypt.DefaultCost)
+		hashedRefresh, err := bcrypt.GenerateFromPassword([]byte(refreshToken), bcrypt.DefaultCost)
 
 		if err != nil {
 			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
@@ -105,56 +110,57 @@ func (server *Server) HandleJwtGet() http.HandlerFunc {
 			}
 		} else {
 			user.Refresh = string(hashedRefresh)
+
 			if err := server.store.User().UpdateRefreshToken(user); err != nil {
 				server.Error(w, r, http.StatusUnprocessableEntity, ErrUserUpdateFailed)
 				return
 			}
 		}
 
-		server.Respond(w, r, http.StatusOK, jwt.TokensPair{
+		server.Respond(w, r, http.StatusOK, TokensPair{
 			Access:  access,
-			Refresh: base64.StdEncoding.EncodeToString([]byte(uuid)),
+			Refresh: base64RefreshToken,
 		})
 	}
 }
 
 func (server *Server) HandleJwtRefresh() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		req := &jwt.TokensPair{}
+		req := &TokensPair{}
 
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 			server.Error(w, r, http.StatusBadRequest, err)
 			return
 		}
 
-		userId, ip, err := jwt.DecodeAccess(req.Access, server.key)
+		userClaims, err := server.jwtHandler.Decode(req.Access)
 
 		if err != nil {
 			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
 		}
 
-		user, err := server.store.User().Find(userId)
+		decodedRefreshToken, err := base64.StdEncoding.DecodeString(req.Refresh)
+
+		if err != nil {
+			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
+			return
+		}
+
+		err = server.jwtHandler.ValidateRefresh(req.Access, string(decodedRefreshToken))
+
+		if err != nil {
+			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
+			return
+		}
+
+		user, err := server.store.User().Find(userClaims.Id)
 
 		if err != nil {
 			server.Error(w, r, http.StatusBadRequest, ErrUserNotFound)
 			return
 		}
 
-		decodedRefresh, err := base64.StdEncoding.DecodeString(req.Refresh)
-
-		if err != nil {
-			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
-			return
-		}
-
-		err = bcrypt.CompareHashAndPassword([]byte(user.Refresh), decodedRefresh)
-
-		if err != nil {
-			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
-			return
-		}
-
-		err = jwt.ValidateRefresh(req.Access, string(decodedRefresh), server.key)
+		err = bcrypt.CompareHashAndPassword([]byte(user.Refresh), decodedRefreshToken)
 
 		if err != nil {
 			server.Error(w, r, http.StatusBadRequest, ErrTokenInvalid)
@@ -163,21 +169,22 @@ func (server *Server) HandleJwtRefresh() http.HandlerFunc {
 
 		ipAddress := strings.Split(r.RemoteAddr, ":")[0]
 
-		if ip != ipAddress {
+		if userClaims.IpAddress != ipAddress {
 			// TODO: Send email
-			fmt.Printf("ip diff detected, expected: %s , was: %s", ipAddress, ip)
+			fmt.Printf("ip diff detected, expected: %s , was: %s", userClaims.IpAddress, ipAddress)
 			fmt.Println()
 		}
 
-		uuid := uuid.New().String()
-		access, err := jwt.NewAccessToken(user, uuid, ipAddress, server.key)
+		refreshToken := uuid.New().String()
+		base64RefreshToken := base64.StdEncoding.EncodeToString([]byte(refreshToken))
+		access, err := server.jwtHandler.NewAccessToken(user, ipAddress, refreshToken)
 
 		if err != nil {
 			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
 			return
 		}
 
-		newHashedRefresh, err := bcrypt.GenerateFromPassword([]byte(uuid), bcrypt.DefaultCost)
+		newHashedRefresh, err := bcrypt.GenerateFromPassword([]byte(refreshToken), bcrypt.DefaultCost)
 
 		if err != nil {
 			server.Error(w, r, http.StatusUnprocessableEntity, ErrTokenCreationFailed)
@@ -190,9 +197,9 @@ func (server *Server) HandleJwtRefresh() http.HandlerFunc {
 			return
 		}
 
-		server.Respond(w, r, http.StatusOK, jwt.TokensPair{
+		server.Respond(w, r, http.StatusOK, TokensPair{
 			Access:  access,
-			Refresh: base64.StdEncoding.EncodeToString([]byte(uuid)),
+			Refresh: base64RefreshToken,
 		})
 	}
 }
