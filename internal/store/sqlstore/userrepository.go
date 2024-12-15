@@ -13,25 +13,31 @@ type UserRepository struct {
 
 func (repository *UserRepository) Create(u *model.User) error {
 	return repository.store.db.QueryRow(
-		"INSERT INTO users (id) VALUES ($1, $2) RETURNING id",
+		"INSERT INTO users (id) VALUES ($1) RETURNING id",
 		u.Id,
 	).Scan(&u.Id)
 }
 
 func (repository *UserRepository) Find(id string) (*model.User, error) {
 	user := &model.User{}
+	refresh := sql.NullString{}
+
 	if err := repository.store.db.QueryRow(
 		"SELECT id, refresh FROM users WHERE id = $1",
 		id,
 	).Scan(
 		&user.Id,
-		&user.Refresh,
+		&refresh,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, store.ErrRecordNotFound
 		}
 
 		return nil, err
+	}
+
+	if refresh.Valid {
+		user.Refresh = refresh.String
 	}
 
 	return user, nil

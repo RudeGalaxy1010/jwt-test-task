@@ -32,3 +32,27 @@ func TestUserRepository_Find(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
 }
+
+func TestUserRepository_UpdateRefreshToken(t *testing.T) {
+	db, teardown := sqlstore.TestDB(t, databaseUrl)
+	defer teardown("users")
+
+	sqlstore := sqlstore.New(db)
+	u := model.TestUser(t)
+
+	sqlstore.User().Create(&model.User{
+		Id: u.Id,
+	})
+	user, err := sqlstore.User().Find(u.Id)
+	assert.NoError(t, err)
+	assert.NotNil(t, user)
+
+	u.Refresh = "test"
+	err = sqlstore.User().UpdateRefreshToken(u)
+	assert.NoError(t, err)
+
+	user, err = sqlstore.User().Find(u.Id)
+	assert.NoError(t, err)
+	assert.NotNil(t, user)
+	assert.Equal(t, u.Refresh, user.Refresh)
+}
