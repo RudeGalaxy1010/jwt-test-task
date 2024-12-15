@@ -27,3 +27,5 @@ Simple rest-api app to provide pair of tokens (JWT Access token + Refresh token)
 </p> Refresh token: MjFlZjgzZTMtZjNlMi00ZGFjLWI3OTYtNjhhM2Q5NTM1NzM3
 <image src ="https://github.com/user-attachments/assets/d5e90be8-e84f-487b-abd2-24119d7f42f1"></image>
 </ul>
+
+That's all, folks!
